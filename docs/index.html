@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpecLane: Serving Small Hybrid-Attention Models Under Agent Traffic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="description" content="A reproducible vLLM configuration study of Qwen3.8-27B-FP8 and Qwen3.5-9B under agent-shaped traffic: speculative decoding, FP8 KV cache, tail latency and answer quality.">
+<style>
+:root {
+  color-scheme: light;
+  --bg: #fcfcfb;
+  --surface: #ffffff;
+  --surface-2: #f4f3f0;
+  --border: #e4e2dc;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #7a7974;
+  --accent: #2a78d6;
+  --accent-soft: #e6f0fc;
+  --context: #b9b8b2;
+  --context-strong: #8f8e88;
+  --good: #0ca30c;
+  --critical: #d03b3b;
+  --grid: #ecebe7;
+  --code-bg: #f4f3f0;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.65 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+}
+.wrap { max-width: 860px; margin: 0 auto; padding: 0 20px; }
+header.top {
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 56px; gap: 16px; }
+.brand { font-weight: 700; letter-spacing: -0.01em; color: var(--text); text-decoration: none; }
+.brand span { color: var(--accent); }
+nav.toc { display: flex; gap: 18px; font-size: 14px; overflow-x: auto; white-space: nowrap; }
+nav.toc a { color: var(--text-2); text-decoration: none; }
+nav.toc a:hover { color: var(--text); }
+.hero { padding: 72px 0 40px; }
+.eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.08; letter-spacing: -0.025em; margin: 12px 0 18px; }
+.lede { font-size: 20px; color: var(--text-2); max-width: 680px; margin: 0; }
+.meta { margin-top: 20px; font-size: 14px; color: var(--text-3); }
+h2 { font-size: 28px; letter-spacing: -0.015em; margin: 72px 0 12px; line-height: 1.2; }
+h3 { font-size: 19px; margin: 36px 0 8px; }
+p { margin: 12px 0; }
+a { color: var(--accent); }
+.muted { color: var(--text-2); }
+.small { font-size: 14px; color: var(--text-3); }
+hr { border: 0; border-top: 1px solid var(--border); margin: 64px 0 0; }
+
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 32px 0 8px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.tile .k { font-size: 13px; color: var(--text-2); }
+.tile .v { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; margin: 4px 0 2px; }
+.tile .s { font-size: 13px; color: var(--text-3); line-height: 1.4; }
+
+.callout {
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  background: var(--surface); border-radius: 10px; padding: 14px 18px; margin: 20px 0;
+}
+.callout.warn { border-left-color: var(--critical); }
+.callout strong { display: block; margin-bottom: 2px; }
+
+.table-wrap { overflow-x: auto; margin: 16px 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 9px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+thead th { font-size: 12.5px; font-weight: 600; color: var(--text-2); background: var(--surface-2); text-transform: none; }
+tbody tr:last-child td { border-bottom: 0; }
+tr.ours td { background: var(--accent-soft); font-weight: 600; }
+td.best { font-weight: 700; }
+td.sig { color: var(--text); font-weight: 700; }
+
+.timeline { list-style: none; padding: 0; margin: 20px 0; position: relative; }
+.timeline::before { content: ""; position: absolute; left: 7px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+.timeline li { position: relative; padding-left: 32px; margin: 0 0 22px; }
+.timeline li::before {
+  content: ""; position: absolute; left: 0; top: 7px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--context-strong);
+}
+.timeline li.key::before { border-color: var(--accent); background: var(--accent); }
+.timeline .when { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.timeline .what { font-weight: 600; }
+
+pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13.5px; line-height: 1.55; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+p code, li code, td code { background: var(--code-bg); padding: 1px 5px; border-radius: 5px; }
+
+figure { margin: 24px 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 18px 12px; }
+figure .ftitle { font-weight: 600; font-size: 15px; }
+figure .fsub { font-size: 13px; color: var(--text-2); margin-bottom: 8px; }
+figcaption { font-size: 13px; color: var(--text-3); margin-top: 6px; line-height: 1.5; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--text-2); margin: 4px 0 8px; }
+.legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.legend i.dot { width: 10px; height: 10px; border-radius: 50%; }
+.tip {
+  position: absolute; pointer-events: none; z-index: 5; opacity: 0; transition: opacity .08s;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; font-size: 12.5px; line-height: 1.45;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.tip b { font-weight: 600; }
+
+.diagram svg { width: 100%; height: auto; display: block; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+.card h4 { margin: 0 0 6px; font-size: 15px; }
+.card p { margin: 0; font-size: 14.5px; color: var(--text-2); }
+
+ul.clean { padding-left: 20px; }
+ul.clean li { margin: 6px 0; }
+footer { border-top: 1px solid var(--border); margin-top: 80px; padding: 28px 0 48px; font-size: 14px; color: var(--text-3); }
+
+@media (max-width: 720px) {
+  body { font-size: 16px; }
+  .wrap { padding: 0 16px; }
+  nav.toc { display: none; }
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .grid2 { grid-template-columns: 1fr; }
+  .hero { padding-top: 44px; }
+  h2 { margin-top: 56px; }
+}
+.formula { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 14px 0; text-align: center; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; line-height: 1.7; overflow-x: auto; }
+.formula .tag { display: block; font-family: Inter, sans-serif; font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
+
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#">SpecLane<span>.</span></a>
+    <nav class="toc">
+      <a href="#results">Results</a>
+      <a href="#evaluation">Evaluation</a>
+      <a href="#method">Method</a>
+      <a href="#negative">More findings</a>
+      <a href="#reproduce">Reproduce</a>
+      <a href="#math">Appendix</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<section class="hero">
+  <div class="eyebrow">Technical report · November 2026</div>
+  <h1>SpecLane: Serving Small Hybrid-Attention Models Under Agent Traffic</h1>
+  <p class="lede">How should an inference engine be configured to serve small language models to AI agents? I study two open-weight models, Qwen3.8-27B-FP8 and Qwen3.5-9B, running on the vLLM engine. I start from the default setup, change one setting at a time, and measure speed, responsiveness and answer quality.</p>
+  <p class="meta">vLLM 0.33.0 · one NVIDIA H100 and one L40S GPU on cloud instances · one run per measurement · code and raw results are in the repository</p>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">27B speed, one request at a time</div><div class="v">+124%</div><div class="s">78 to 175 tokens per second with multi-token-prediction speculation (MTP-3).</div></div>
+    <div class="tile"><div class="k">27B speed, 16 requests at once</div><div class="v">+50%</div><div class="s">800 to 1,199 tokens per second on the agent-session workload.</div></div>
+    <div class="tile"><div class="k">9B speed, one request at a time</div><div class="v">+77%</div><div class="s">43 to 75 tokens per second with multi-token-prediction speculation (MTP-2).</div></div>
+    <div class="tile"><div class="k">Change in answer accuracy</div><div class="v">±2 of 200</div><div class="s">At most two questions out of 200: within normal sampling noise.</div></div>
+  </div>
+  <p class="small">Speed and latency figures are generated from the raw result files by <code>paper/make_results.py</code>. The accuracy check was run on live endpoints with <code>scripts/gsm8k_endpoint.py</code>.</p>
+</section>
+
+<h2>In short</h2>
+<ul class="clean">
+  <li><strong>What this is.</strong> A measurement study of features that already exist in vLLM. It does not propose a new method.</li>
+  <li><strong>Main finding.</strong> Speculative decoding, using the multi-token-prediction (MTP) head that ships with each model, made text generation 50&ndash;124% faster on the 27B model and up to 77% faster on the 9B model. I measured no loss in answer quality.</li>
+  <li><strong>A setting I do not recommend.</strong> Storing the attention cache in 8-bit floating point (FP8) made generation slower and the first response later at this model scale, so I do not recommend it.</li>
+  <li><strong>A startup problem.</strong> With default settings, vLLM 0.33.0 cannot start the 27B model on a single H100 GPU, because its default limit on concurrent sequences is higher than the memory for per-sequence state can support.</li>
+  <li><strong>Agent harness study.</strong> I also evaluated a prompt-based agent harness on two agent benchmarks. At the sample sizes run, it showed no measurable accuracy difference, so I report it for completeness and draw no conclusion from it.</li>
+</ul>
+
+<h2>Key terms</h2>
+<div class="grid2">
+  <div class="card"><h4>Throughput</h4><p>How many output tokens (word pieces) the server generates per second, summed over all requests. Higher is better.</p></div>
+  <div class="card"><h4>Time to first token (TTFT)</h4><p>How long a request waits before the first token appears. It governs how responsive the system feels. Lower is better.</p></div>
+  <div class="card"><h4>p99</h4><p>The 99th percentile: the value that all but the slowest 1% of requests stay under. With 24 requests per measurement, it is simply the slowest request.</p></div>
+  <div class="card"><h4>Concurrency (c)</h4><p>How many requests are in flight at the same time. c = 1 measures a single user; c = 16 measures a loaded server.</p></div>
+  <div class="card"><h4>Multi-token prediction (MTP)</h4><p>Alongside its normal output layer, each model carries a small extra head trained to predict several upcoming tokens at once. In speculative decoding that head proposes the next few tokens cheaply, and the full model verifies all of them in a single pass, keeping every correct proposal. The number after MTP in the detailed tables is how many tokens are proposed per step.</p></div>
+  <div class="card"><h4>KV cache</h4><p>Memory that stores the attention keys and values of earlier tokens so they are not recomputed. &ldquo;FP8 KV cache&rdquo; stores them in 8-bit precision to save memory.</p></div>
+</div>
+
+<h2 id="results">Results</h2>
+<p><strong>MTP</strong> is speculative decoding with the model&rsquo;s multi-token-prediction head. Output tokens per second on the <code>agent_sessions</code> workload (multi-turn conversations that resend their history), one run per measurement. The change from the default (&ldquo;baseline&rdquo;) setup is in parentheses. <em>c</em> is concurrency. The last column is the p99 time to first token, in seconds, at <em>c</em> = 16.</p>
+
+<div class="table-wrap"><table>
+<thead><tr><th>model</th><th>profile</th><th>c = 1</th><th>c = 16</th><th>p99 TTFT, c = 16 (s)</th></tr></thead>
+<tbody>
+<tr><td>Qwen3.8-27B-FP8</td><td>baseline</td><td>78</td><td>800</td><td>1.09</td></tr>
+<tr class="ours"><td>Qwen3.8-27B-FP8</td><td>MTP, 3 proposed tokens</td><td>175 (+124%)</td><td>1,199 (+50%)</td><td>0.94</td></tr>
+<tr><td>Qwen3.8-27B-FP8</td><td>MTP (3) + FP8 KV cache</td><td>163 (+110%)</td><td>1,007 (+26%)</td><td>1.20</td></tr>
+<tr><td>Qwen3.8-27B-FP8</td><td>FP8 KV cache</td><td>76 (−2%)</td><td>684 (−14%)</td><td>1.46</td></tr>
+<tr><td>Qwen3.5-9B</td><td>baseline</td><td>43</td><td>475</td><td>0.95</td></tr>
+<tr class="ours"><td>Qwen3.5-9B</td><td>MTP, 2 proposed tokens</td><td>75 (+77%)</td><td>753 (+59%)</td><td>0.74</td></tr>
+<tr><td>Qwen3.5-9B</td><td>FP8 KV cache</td><td>43 (+0%)</td><td>467 (−2%)</td><td>1.42</td></tr>
+</tbody></table></div>
+
+<div class="callout"><strong>Why 3 on one model and 2 on the other?</strong>The number is how many tokens the MTP head proposes per step. Proposing more can save more work when the proposals are right, but each wrong proposal is wasted effort, so every model has a best value. I used 3 on the 27B, the value recommended for that model, and tried 1 and 2 on the 9B: 2 was faster (+77% against +44% at c = 1), and it is also the value in that model&rsquo;s documentation. I did not search other values on the 27B, so 3 there is the recommended setting rather than a tuned optimum.</div>
+
+<figure>
+  <div class="ftitle">Throughput by profile, agent sessions</div>
+  <div class="fsub">Output tokens per second. Hover a bar for the exact value.</div>
+  <div class="legend"><span><i style="background:var(--context)"></i>baseline</span><span><i style="background:var(--accent)"></i>multi-token prediction, MTP (recommended)</span><span><i style="background:var(--critical)"></i>FP8 KV cache</span></div>
+  <div class="chart" id="tpChart"></div>
+  <figcaption>One run per bar, so there are no error bars. The baseline setup gave the same result within about 2% when started separately, so I do not claim differences smaller than about 5%.</figcaption>
+</figure>
+
+<div class="callout"><strong>Read speed and responsiveness together.</strong>A faster server can still have a slower worst case. On the 27B model with 16 requests at once (<code>shared_prefix</code> workload), MTP-3 raised throughput by 75% but also raised the p99 time to first token from 0.53 s to 0.79 s. The FP8 KV cache raised it to 1.47 s while also lowering throughput, so it was worse on both measures.</div>
+
+<h2 id="evaluation">Detailed evaluation</h2>
+
+<h3>Throughput</h3>
+<p>Output tokens per second, with the change from baseline in parentheses. <code>shared_prefix</code> sends many requests that start with the same long prompt; <code>agent_sessions</code> sends multi-turn conversations.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Qwen3.8-27B-FP8 (H100)</th><th>shared_prefix c=1</th><th>shared_prefix c=16</th><th>agent_sessions c=1</th><th>agent_sessions c=16</th></tr></thead>
+<tbody>
+<tr><td>baseline</td><td>79</td><td>743</td><td>78</td><td>800</td></tr>
+<tr><td>kv-fp8</td><td>76 (−3%)</td><td>612 (−18%)</td><td>76 (−2%)</td><td>684 (−14%)</td></tr>
+<tr class="ours"><td>mtp-3</td><td>176 (+123%)</td><td>1,297 (+75%)</td><td>175 (+124%)</td><td>1,199 (+50%)</td></tr>
+<tr><td>mtp-3 + kv-fp8</td><td>167 (+111%)</td><td>1,018 (+37%)</td><td>163 (+110%)</td><td>1,007 (+26%)</td></tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead><tr><th>Qwen3.5-9B (L40S)</th><th>shared_prefix c=1</th><th>shared_prefix c=16</th><th>agent_sessions c=1</th><th>agent_sessions c=16</th></tr></thead>
+<tbody>
+<tr><td>baseline</td><td>43</td><td>420</td><td>43</td><td>475</td></tr>
+<tr><td>kv-fp8</td><td>43 (−0%)</td><td>399 (−5%)</td><td>43 (+0%)</td><td>467 (−2%)</td></tr>
+<tr><td>mtp-1</td><td>61 (+41%)</td><td>499 (+19%)</td><td>61 (+44%)</td><td>617 (+30%)</td></tr>
+<tr class="ours"><td>mtp-2</td><td>71 (+65%)</td><td>644 (+53%)</td><td>75 (+77%)</td><td>753 (+59%)</td></tr>
+</tbody></table></div>
+
+<h3>Tail latency</h3>
+<p>p99 time to first token, in seconds. With 24 requests per measurement, the p99 equals the slowest request.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Qwen3.8-27B-FP8</th><th>shared_prefix c=1</th><th>shared_prefix c=16</th><th>agent_sessions c=1</th><th>agent_sessions c=16</th></tr></thead>
+<tbody>
+<tr><td>baseline</td><td>0.35</td><td>0.53</td><td>0.27</td><td>1.09</td></tr>
+<tr><td>kv-fp8</td><td>0.36</td><td>1.47</td><td>0.27</td><td>1.46</td></tr>
+<tr class="ours"><td>mtp-3</td><td>0.36</td><td>0.79</td><td>0.28</td><td>0.94</td></tr>
+<tr><td>mtp-3 + kv-fp8</td><td>0.37</td><td>1.51</td><td>0.29</td><td>1.20</td></tr>
+</tbody></table></div>
+<div class="table-wrap"><table>
+<thead><tr><th>Qwen3.5-9B</th><th>shared_prefix c=1</th><th>shared_prefix c=16</th><th>agent_sessions c=1</th><th>agent_sessions c=16</th></tr></thead>
+<tbody>
+<tr><td>baseline</td><td>0.53</td><td>0.69</td><td>0.41</td><td>0.95</td></tr>
+<tr><td>kv-fp8</td><td>0.58</td><td>1.39</td><td>0.43</td><td>1.42</td></tr>
+<tr><td>mtp-1</td><td>0.54</td><td>1.54</td><td>0.46</td><td>0.95</td></tr>
+<tr class="ours"><td>mtp-2</td><td>0.57</td><td>0.84</td><td>0.45</td><td>0.74</td></tr>
+</tbody></table></div>
+
+<h3>Answer quality</h3>
+<p>In principle, speculative decoding does not change what the model outputs, because every proposed token is verified by the full model. An implementation can still differ from the theory, so I checked. I deployed the default and the MTP setup of each model as live servers and asked both the same 200 grade-school math questions (a fixed random sample of GSM8K), with the sampling temperature set to 0 and the model's extended &ldquo;thinking&rdquo; mode turned off. An answer counts as correct only if its final number exactly matches the reference.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>model</th><th>baseline</th><th>MTP</th><th>difference</th></tr></thead>
+<tbody>
+<tr><td>Qwen3.8-27B-FP8 (MTP-3)</td><td>0.940</td><td>0.935</td><td>−1 question</td></tr>
+<tr><td>Qwen3.5-9B (MTP-2)</td><td>0.900</td><td>0.910</td><td>+2 questions</td></tr>
+</tbody></table></div>
+<p>The differences are one and two questions out of 200, which is within normal sampling noise. I did not run this check for the FP8 KV cache.</p>
+
+<h2 id="method">Method</h2>
+<div class="grid2">
+  <div class="card"><h4>Models and hardware</h4><p>Qwen3.8-27B-FP8 (a 27-billion-parameter model, 31 GB, Apache-2.0 licence) on one H100 GPU with 80 GB of memory, and Qwen3.5-9B (9 billion parameters, 19 GB, Apache-2.0) on one L40S GPU with 48 GB. Each model runs on its own GPU in a separate container. Software: vLLM 0.33.0, PyTorch 2.14, CUDA 13.0.</p></div>
+  <div class="card"><h4>The baseline</h4><p>The engine's default settings, plus only what is needed to start the model and a fixed context length of 16,384 tokens. The 9B model needs <code>--trust-remote-code</code>. The 27B model needs <code>--max-num-seqs 512</code> (explained below).</p></div>
+  <div class="card"><h4>Settings tested</h4><p>Each test changes exactly one setting from the baseline: speculative decoding with <em>k</em> proposed tokens, the FP8 KV cache, scheduler limits, asynchronous scheduling, or turning prefix caching off. I then combine the best ones.</p></div>
+  <div class="card"><h4>Workloads</h4><p><code>shared_prefix</code>: a 3,000-token system prompt shared by all requests, a 150-token question, and up to 256 output tokens. <code>agent_sessions</code>: six-turn conversations with a 2,000-token shared system prompt, where each turn resends the full history. Prompts are random words, so no request is answered from cache by accident.</p></div>
+</div>
+<p>The load generator runs inside the same container as the server, so no network delay is included. Every measurement is preceded by warm-up requests drawn with a different random seed. I test 1 and 16 concurrent requests. <code>shared_prefix</code> sends 24 requests per measurement. <code>agent_sessions</code> sends 24 requests at c = 1 and 96 at c = 16. Throughput is the number of output tokens divided by the elapsed time.</p>
+
+<h3>A startup failure on a hybrid-attention model</h3>
+<p>Qwen3.8-27B uses a cheaper &ldquo;linear&rdquo; form of attention in 48 of its 64 layers. Those layers keep a fixed-size state for every active sequence, so the number of sequences an engine can hold is limited by that state as well as by the KV cache. With vLLM 0.33.0&rsquo;s default settings on one H100, the 27B model failed to start. The engine stopped while preparing its optimised execution graphs, with this error:</p>
+<pre><code>ValueError: max_num_seqs (1024) exceeds available Mamba cache blocks (745).
+Each decode sequence requires one Mamba cache block, so CUDA graph capture
+cannot proceed. Please lower max_num_seqs to at most 745 or increase
+gpu_memory_utilization.</code></pre>
+<p>The default limit of 1,024 concurrent sequences is higher than the 745 state slots that fit in memory next to the model. Setting <code>--max-num-seqs 512</code> fixes it, so I include it in the baseline. In this report, &ldquo;baseline&rdquo; therefore means the defaults plus whatever is needed to start.</p>
+
+<h2 id="negative">More findings</h2>
+<h3>The FP8 KV cache: not recommended at this scale</h3>
+<p>Storing the KV cache in 8-bit precision lowered throughput (by 14% on the 27B model with 16 requests at once) and raised the p99 time to first token from 0.53 s to 1.47 s on <code>shared_prefix</code>. Its purpose is to free memory, but at these model sizes memory is not the limiting factor, and the extra conversion work shows up as lost speed. It is not part of the recommended setup.</p>
+
+<h3>Agent harness study</h3>
+<p>I also asked whether a carefully engineered prompt for the coding agent (the &ldquo;harness&rdquo;), combined with the tuned engine, makes agents more accurate. I compared it with the default agent on the default engine, using Terminal-Bench 2.1 (command-line tasks, Qwen3.8-27B) and τ²-bench (customer-service conversations, Qwen3.5-9B). At the sample sizes I could afford, there was no reliable difference.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>task set (same tasks in both arms; valid outcomes only)</th><th>tasks</th><th>default</th><th>engineered</th><th>note</th></tr></thead>
+<tbody>
+<tr><td>τ²-bench airline, test</td><td>19</td><td>0.84</td><td>0.84</td><td>tie; uncertainty about ±0.21</td></tr>
+<tr><td>τ²-bench retail, test</td><td>5</td><td>1.00</td><td>0.80</td><td>one task worse</td></tr>
+<tr><td>Terminal-Bench, first 10 test tasks</td><td>10</td><td>0.30</td><td>0.40</td><td>one task better, none worse</td></tr>
+<tr><td>Terminal-Bench, final round</td><td>8</td><td>2 solved</td><td>2 solved</td><td>tie; the rest hit sandbox errors</td></tr>
+<tr><td>Terminal-Bench, dev tasks</td><td>5</td><td>0.20</td><td>0.80</td><td>not used for tuning; not confirmed on the test tasks</td></tr>
+</tbody></table></div>
+<div class="callout"><strong>Scope of the agent results.</strong>These are small samples with one attempt per task, so they are best read as a pilot. The development tasks favoured the engineered harness; the held-out test tasks showed no measurable difference. Two prompt changes aimed at a failure in which the model reasons until it reaches its length limit did not change the outcome. A larger, repeated study is the natural next step for any agent-accuracy claim.</div>
+
+<h3>Evaluation pipeline fixes</h3>
+<ul class="clean">
+  <li><strong>Missing tool-calling settings.</strong> My first Terminal-Bench pilot scored 0 on every task because the server rejected the agent&rsquo;s tool definitions with an HTTP 400 error, so no tokens were ever generated. I withdrew that pilot and enabled tool calling on every server.</li>
+  <li><strong>τ²-bench judge defaults to OpenAI.</strong> Some τ²-bench tasks are graded by a language model. By default it calls an OpenAI model, which failed without a key and scored the task 0 in both arms. The grader now uses my default 27B server in every run.</li>
+  <li><strong>Sandbox image builds.</strong> The older container-image builder failed on plain Ubuntu task images (<code>python: not found</code>); selecting its newer version fixed it. Later sandbox conflict errors came from starting 30 sandboxes at once. Those trials are excluded and are not counted as model failures.</li>
+</ul>
+
+<h2 id="reproduce">Reproduce</h2>
+<p>Everything is driven by a small, engine-agnostic configuration layer: a model registry, a set of named serving profiles (the baseline and one-change variants), a workload generator, a load-testing client and a quality check. Any machine with a supported GPU and vLLM can run it. The repository README lists the exact commands for each step:</p>
+<ol class="clean">
+  <li><strong>Stage the model</strong> weights and verify that every candidate setting is accepted by the installed vLLM version.</li>
+  <li><strong>Sweep</strong> the profiles and workloads at the chosen concurrency levels, with the accuracy check enabled.</li>
+  <li><strong>Serve</strong> the baseline or the tuned (MTP) profile behind an authenticated, OpenAI-compatible endpoint.</li>
+  <li><strong>Rebuild</strong> the tables, figure and paper directly from the raw result files with <code>paper/make_results.py</code>.</li>
+</ol>
+<p class="small">A deployed endpoint keeps its GPU allocated until it is stopped, so shut it down when a run is finished.</p>
+
+<h2>Acknowledgements</h2>
+<p class="muted">This work builds on vLLM and the Qwen model family. The agent-harness study used Terminal-Bench 2.1 (run with Harbor) and τ²-bench.</p>
+
+<h2 id="math">Appendix: how multi-token prediction works</h2>
+<div class="callout"><strong>What I did and did not do.</strong>I did not design or train the MTP head. It ships inside each Qwen model, trained by the model&rsquo;s authors. My work is to switch it on, choose how many tokens it proposes, and measure the result. This section gives the mathematics of how it is used and why it makes generation faster, and checks the theory against my measurements.</div>
+
+<h3>1. The head proposes, the model verifies</h3>
+<p>Plain decoding runs the full model once per generated token. Speculative decoding adds a cheap <em>proposer</em> that guesses the next <em>k</em> tokens; the full model then checks all <em>k</em> guesses in a single forward pass. With MTP, the proposer is a small head attached to the model. In the general MTP design (published for DeepSeek-V3; I have not inspected the exact Qwen layer layout), the head for the <em>j</em>-th future token combines the model&rsquo;s hidden state with the embedding of the token just proposed, passes them through one light transformer block, and reuses the model&rsquo;s own output layer:</p>
+<div class="formula">h&prime;<sub>j</sub> = Block<sub>j</sub>( W<sub>j</sub> [ norm(h<sub>j&minus;1</sub>) ; norm(E(x&#770;<sub>j&minus;1</sub>)) ] )<br>q<sub>j</sub> = softmax( LMhead( norm(h&prime;<sub>j</sub>) ) ),&nbsp;&nbsp; x&#770;<sub>j</sub> = argmax q<sub>j</sub><span class="tag">proposal j = 1…k; E and LMhead are shared with the main model, so the head is small</span></div>
+<p>The model authors train the head with an extra loss for each future position, added to the usual next-token loss, where <em>&lambda;</em> weights the extra terms:</p>
+<div class="formula">L = L<sub>main</sub> + &lambda; &middot; &Sigma;<sub>j=1..k</sub> L<sub>j</sub>,&nbsp;&nbsp; L<sub>j</sub> = &minus; log q<sub>j</sub>( x<sub>t+j+1</sub> | x<sub>&le;t</sub> )<span class="tag">training objective (done by the model authors, not by me)</span></div>
+
+<h3>2. Verification keeps the output identical</h3>
+<p>Let <em>p</em> be the full model&rsquo;s distribution at a position and <em>q</em> the proposer&rsquo;s. A proposed token <em>x</em> is accepted with probability <em>min(1, p(x)/q(x))</em>. At the first rejection, the token is replaced by a sample from the leftover distribution, and the remaining proposals are discarded:</p>
+<div class="formula">P(accept x) = min(1, p(x)/q(x))&nbsp;&nbsp;&nbsp;&nbsp;on reject: x &sim; norm( max(0, p &minus; q) )<span class="tag">at temperature 0 this reduces to: accept if x&#770; = argmax p, otherwise take argmax p</span></div>
+<p>The emitted token then follows exactly <em>p</em>, the full model&rsquo;s own distribution:</p>
+<div class="formula">P(x) = q(x)&middot;min(1, p(x)/q(x)) + [ 1 &minus; &Sigma;<sub>y</sub> min(p(y), q(y)) ] &middot; max(0, p(x) &minus; q(x)) / &Sigma;<sub>y</sub> max(0, p(y) &minus; q(y)) = p(x)<span class="tag">the first term is min(p,q); the second is the leftover mass, which supplies exactly p &minus; min(p,q)</span></div>
+<p>So speculative decoding changes the speed, not the distribution of outputs. If all <em>k</em> proposals are accepted, the same verification pass also yields one extra token for free, so a step produces between 1 and <em>k</em>+1 tokens.</p>
+
+<h3>3. Expected tokens per step and the speedup</h3>
+<p>Let <em>&alpha;</em> be the probability that a proposal is accepted, assumed equal at every position. A step produces <em>j</em> tokens when the first <em>j</em>&minus;1 proposals are accepted and the next is not, so the expected number of tokens per step is a geometric sum. Let <em>c</em> be the cost of one proposal step relative to one full-model step. Because verifying <em>k</em>+1 positions costs about one full-model step when decoding is limited by memory bandwidth, the speedup is:</p>
+<div class="formula">E[tokens per step] = &Sigma;<sub>j=0..k</sub> &alpha;<sup>j</sup> = (1 &minus; &alpha;<sup>k+1</sup>) / (1 &minus; &alpha;)<br>Speedup S(k) = E[tokens per step] / (1 + c&middot;k)<span class="tag">upper limit as k grows: 1 / (1 &minus; &alpha;)</span></div>
+<p>Two forces set the best <em>k</em>. Each extra proposal adds a term <em>&alpha;<sup>k</sup></em> to the numerator, which shrinks geometrically, while it adds <em>c</em> to the denominator. The speedup therefore rises, peaks and then falls. For illustration, with <em>&alpha;</em> = 0.6 and <em>c</em> = 0.1, S(1) = 1.46, S(2) = 1.63, S(3) = 1.67, S(4) = 1.65 and S(6) = 1.52, so the best value is 3. This is a worked example of the shape, not a measurement. It is why each model has a best <em>k</em> and why I compared 1 and 2 on the 9B.</p>
+
+<h3>4. Checking the theory against my measurements</h3>
+<p>My measured speedups bound the acceptance rate. Since S = E / (1 + c&middot;k) &le; E, setting E equal to the measured speedup and solving for <em>&alpha;</em> gives a <em>lower bound</em> on the acceptance rate. This assumes equal acceptance at every position, which is an approximation.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>model, k</th><th>requests at once</th><th>measured speedup</th><th>max possible (k+1)</th><th>implied acceptance rate &alpha; &ge;</th></tr></thead>
+<tbody>
+<tr><td>Qwen3.8-27B, k = 3</td><td>1</td><td>2.24&times;</td><td>4</td><td>0.62</td></tr>
+<tr><td>Qwen3.8-27B, k = 3</td><td>16</td><td>1.50&times;</td><td>4</td><td>0.34</td></tr>
+<tr><td>Qwen3.5-9B, k = 1</td><td>1</td><td>1.44&times;</td><td>2</td><td>0.44</td></tr>
+<tr><td>Qwen3.5-9B, k = 2</td><td>1</td><td>1.77&times;</td><td>3</td><td>0.51</td></tr>
+<tr><td>Qwen3.5-9B, k = 2</td><td>16</td><td>1.59&times;</td><td>3</td><td>0.42</td></tr>
+</tbody></table></div>
+<p>Measured speedups come from the <code>agent_sessions</code> workload. Two observations are consistent with the model. First, the speedup is below the cap of <em>k</em>+1 in every row, as it must be. Second, the speedup is smaller with 16 requests at once than with one. Batching makes the full-model step more compute-bound, so verifying extra tokens costs more and the effective <em>c</em> rises. I did not measure <em>&alpha;</em> or <em>c</em> directly, so this explanation is a consistent reading of the numbers and not a tested claim.</p>
+
+</main>
+
+<footer>
+  <div class="wrap">SpecLane · technical report · November 2026 · code and raw results in the repository · see <code>FINDINGS.md</code> and <code>DEVIATIONS.md</code>.</div>
+</footer>
+
+<script>
+(function () {
+  const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  const NS = 'http://www.w3.org/2000/svg';
+  function el(name, attrs, parent) { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+  function tipFor(box) {
+    const t = document.createElement('div'); t.className = 'tip'; box.appendChild(t);
+    return { show(html, x, y) { t.innerHTML = html; t.style.left = (x + 12) + 'px'; t.style.top = (y + 12) + 'px'; t.style.opacity = 1; }, hide() { t.style.opacity = 0; } };
+  }
+  function pos(box, ev) { const r = box.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+
+  // groups: model x concurrency; bars: baseline, MTP, FP8 KV cache
+  const data = [
+    { label: 'Qwen3.8-27B, c=1', vals: [['baseline', 78], ['MTP-3', 175], ['FP8 KV', 76]] },
+    { label: 'Qwen3.8-27B, c=16', vals: [['baseline', 800], ['MTP-3', 1199], ['FP8 KV', 684]] },
+    { label: 'Qwen3.5-9B, c=1', vals: [['baseline', 43], ['MTP-2', 75], ['FP8 KV', 43]] },
+    { label: 'Qwen3.5-9B, c=16', vals: [['baseline', 475], ['MTP-2', 753], ['FP8 KV', 467]] },
+  ];
+  const colors = () => [css('--context'), css('--accent'), css('--critical')];
+
+  function draw() {
+    const box = document.getElementById('tpChart'); box.innerHTML = '';
+    const W = 760, H = 300, L = 44, R = 8, T = 12, B = 44;
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Grouped bars of output tokens per second by profile for each model and concurrency' }, box);
+    const max = 1300, y = (v) => T + (H - T - B) * (1 - v / max);
+    [0, 325, 650, 975, 1300].forEach((g) => {
+      el('line', { x1: L, x2: W - R, y1: y(g), y2: y(g), stroke: css('--grid') }, svg);
+      const t = el('text', { x: L - 6, y: y(g) + 4, 'text-anchor': 'end', 'font-size': 11, fill: css('--text-3') }, svg); t.textContent = g;
+    });
+    const gw = (W - L - R) / data.length, bw = gw * 0.2, cols = colors(), tip = tipFor(box);
+    data.forEach((g, i) => {
+      const x0 = L + i * gw + gw * 0.5 - bw * 1.6;
+      g.vals.forEach(([name, v], j) => {
+        const x = x0 + j * (bw * 1.08), h = y(0) - y(v);
+        const r = el('rect', { x, y: y(v), width: bw, height: h, rx: 3, fill: cols[j] }, svg);
+        r.addEventListener('mousemove', (e) => { const [px, py] = pos(box, e); tip.show(`<b>${g.label}</b><br>${name}: ${v} tokens/s`, px, py); });
+        r.addEventListener('mouseleave', tip.hide);
+      });
+      const lt = el('text', { x: L + i * gw + gw / 2, y: H - 18, 'text-anchor': 'middle', 'font-size': 12, fill: css('--text-2') }, svg); lt.textContent = g.label;
+    });
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

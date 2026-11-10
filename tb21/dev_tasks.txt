@@ -1,0 +1,10 @@
+adaptive-rejection-sampler
+db-wal-recovery
+feal-linear-cryptanalysis
+merge-diff-arc-agi-task
+mteb-retrieve
+nginx-request-logging
+polyglot-c-py
+sanitize-git-repo
+torch-tensor-parallelism
+winning-avg-corewars

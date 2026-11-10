@@ -1,0 +1,21 @@
+# model weights and caches live on Modal volumes / Hugging Face, never in the repo
+*.safetensors
+*.gguf
+**/checkpoints/
+# endpoint URLs and keys
+endpoints.env
+.env
+# environments and third-party clones
+.venv/
+external/
+# agent-run artifacts (large, regenerable)
+jobs/
+# local scratch and build output
+__pycache__/
+.pytest_cache/
+.DS_Store
+paper/main.aux
+paper/main.bbl
+paper/main.blg
+paper/main.log
+paper/main.out

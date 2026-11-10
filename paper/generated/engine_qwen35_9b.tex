@@ -1,0 +1,10 @@
+\begin{tabular}{lrrrr}
+\toprule
+Profile & shared\_prefix, c=1 & shared\_prefix, c=16 & agent\_sessions, c=1 & agent\_sessions, c=16 \\
+\midrule
+baseline & 43 & 420 & 43 & 475 \\
+kv-fp8 & 43 (-0\%) & 399 (-5\%) & 43 (+0\%) & 467 (-2\%) \\
+mtp-1 & 61 (+41\%) & 499 (+19\%) & 61 (+44\%) & 617 (+30\%) \\
+mtp-2 & 71 (+65\%) & 644 (+53\%) & 75 (+77\%) & 753 (+59\%) \\
+\bottomrule
+\end{tabular}
