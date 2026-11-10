@@ -5,9 +5,7 @@
 # endpoint URLs and keys
 endpoints.env
 .env
-# environments and third-party clones
 .venv/
-external/
 # agent-run artifacts (large, regenerable)
 jobs/
 # local scratch and build output
@@ -19,3 +17,5 @@ paper/main.bbl
 paper/main.blg
 paper/main.log
 paper/main.out
+# local third-party clone
+external/

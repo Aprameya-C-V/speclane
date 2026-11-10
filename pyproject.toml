@@ -1,5 +1,5 @@
 [project]
-name = "inference-engineering"
+name = "speclane"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = ["modal", "aiohttp"]

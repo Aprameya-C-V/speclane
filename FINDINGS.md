@@ -2,9 +2,9 @@
 
 Every throughput and latency number here is generated from the result files in
 `infer/results/` by `paper/make_results.py`. The GSM8K numbers come from
-`scripts/gsm8k_endpoint.py` run on live endpoints. Agent-study numbers come from
-`scripts/score_main.py` and `scripts/score_final.py` over `jobs/` (not committed; see
-`.gitignore`). Single runs unless stated.
+`scripts/gsm8k_endpoint.py` run on live endpoints. The agent-study numbers in section 5 come
+from the pilot recorded in `DEVIATIONS.md`; that code is not part of this repository. Single
+runs unless stated.
 
 ## 0. Problems found along the way, and what was withdrawn
 
@@ -24,7 +24,7 @@ with a real tool-call request before any agent run. That pilot is withdrawn.
 assertion called `gpt-5.4-mini` on `api.openai.com` with no key, ended as
 `infrastructure_error` and scored 0, in both arms. It made the engineered agent look worse on
 dev retail (0.71 versus 0.83) until the cause was found. The judge now points at the vanilla
-27B endpoint in every cell (`harness/tau2_judge.py`). Earlier τ² runs that hit it were rerun
+27B endpoint in every cell. Earlier τ² runs that hit it were rerun
 or excluded.
 
 **Modal's legacy image builder fails on plain Ubuntu task images.** It runs
@@ -108,7 +108,8 @@ Differences below roughly 5% are therefore treated as noise. GSM8K on the baseli
 I also tested whether an engineered prompt harness plus the tuned engine improves agent
 accuracy. It did not, at a sample size that could show it. Numbers are paired comparisons of
 vanilla (default agent, vanilla engine) against engineered (engineered prompt, tuned engine),
-excluding trials that never produced a valid outcome.
+excluding trials that never produced a valid outcome. The runnable code was not kept; this table
+and `DEVIATIONS.md` are the record.
 
 | set | n | vanilla | engineered | note |
 |---|---|---|---|---|

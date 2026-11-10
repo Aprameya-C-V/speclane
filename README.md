@@ -9,9 +9,10 @@ endpoint, the quality check, the raw per-run results and the paper source. Every
 generated from the result files in `infer/results/` by `paper/make_results.py`, except the
 GSM8K quality check, which is produced by `scripts/gsm8k_endpoint.py`.
 
-Technical report: [`docs/index.html`](docs/index.html). Paper: `paper/main.pdf` (LaTeX source in `paper/`). Detailed measurements, bugs and withdrawn
-claims: [`FINDINGS.md`](FINDINGS.md). Agent-harness study (dropped, inconclusive):
-[`DEVIATIONS.md`](DEVIATIONS.md).
+Technical report: [`docs/index.html`](docs/index.html), served at
+<https://aprameya-c-v.github.io/speclane/>. Paper: `paper/main.pdf` (LaTeX source in `paper/`).
+Detailed measurements, bugs and withdrawn claims: [`FINDINGS.md`](FINDINGS.md). Agent-harness
+pilot (dropped, inconclusive, code not kept): [`DEVIATIONS.md`](DEVIATIONS.md).
 
 > The techniques studied (speculative decoding, FP8 KV cache, scheduler limits) are existing
 > engine features. This is a measurement study, not a new method.
@@ -74,9 +75,10 @@ infer/gateway.py       OpenAI-compatible gateway with routing and failover (unit
 infer/results/         raw per-run results; round2/ holds the partial second round
 scripts/gsm8k_endpoint.py  GSM8K check against a deployed, key-protected endpoint
 paper/                 LaTeX source, make_results.py (tables, figure), main.pdf
-harness/, tb21/, scripts/run_tau2.sh, scripts/score_*.py   the dropped agent-harness study
+docs/                  technical report (index.html) and the illustration prompt
 tests/                 45 tests against a fake backend
-EXPERIMENT.md          pre-registered plan for the agent study; DEVIATIONS.md records the changes
+FINDINGS.md            every table, the bugs found and the claims withdrawn
+DEVIATIONS.md          the dropped agent-harness pilot and its deviations
 ```
 
 ## Reproduce
