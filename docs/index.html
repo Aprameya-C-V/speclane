@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<meta name="description" content="A reproducible vLLM configuration study of Qwen3.8-27B-FP8 and Qwen3.5-9B under agent-shaped traffic: speculative decoding, FP8 KV cache, tail latency and answer quality.">
+<meta name="description" content="A reproducible vLLM serving configuration for Qwen3.8-27B-FP8 and Qwen3.5-9B under agent-shaped traffic, verified with throughput, tail-latency and answer-quality measurements: speculative decoding, FP8 KV cache.">
 <style>
 :root {
   color-scheme: light;
@@ -162,7 +162,7 @@ footer { border-top: 1px solid var(--border); margin-top: 80px; padding: 28px 0 
 <section class="hero">
   <div class="eyebrow">Technical report · November 2026</div>
   <h1>SpecLane: Serving Small Hybrid-Attention Models Under Agent Traffic</h1>
-  <p class="lede">How should an inference engine be configured to serve small language models to AI agents? I study two open-weight models, Qwen3.8-27B-FP8 and Qwen3.5-9B, running on the vLLM engine. I start from the default setup, change one setting at a time, and measure speed, responsiveness and answer quality.</p>
+  <p class="lede">How should an inference engine be configured to serve small language models to AI agents? I built a serving configuration for two open-weight models, Qwen3.8-27B-FP8 and Qwen3.5-9B, on the vLLM engine. I start from the default setup, change one setting at a time, and measure speed, responsiveness and answer quality to verify each change.</p>
   <p class="meta">vLLM 0.33.0 · one NVIDIA H100 and one L40S GPU on cloud instances · one run per measurement · code and raw results are in the repository</p>
 
   <div class="tiles">
@@ -176,11 +176,11 @@ footer { border-top: 1px solid var(--border); margin-top: 80px; padding: 28px 0 
 
 <h2>In short</h2>
 <ul class="clean">
-  <li><strong>What this is.</strong> A measurement study of features that already exist in vLLM. It does not propose a new method.</li>
+  <li><strong>What this is.</strong> A serving configuration built from features that already exist in vLLM. The benchmarks verify the configuration; no new method is proposed.</li>
   <li><strong>Main finding.</strong> Speculative decoding, using the multi-token-prediction (MTP) head that ships with each model, made text generation 50&ndash;124% faster on the 27B model and up to 77% faster on the 9B model. I measured no loss in answer quality.</li>
   <li><strong>A setting I do not recommend.</strong> Storing the attention cache in 8-bit floating point (FP8) made generation slower and the first response later at this model scale, so I do not recommend it.</li>
   <li><strong>A startup problem.</strong> With default settings, vLLM 0.33.0 cannot start the 27B model on a single H100 GPU, because its default limit on concurrent sequences is higher than the memory for per-sequence state can support.</li>
-  <li><strong>Agent harness study.</strong> I also evaluated a prompt-based agent harness on two agent benchmarks. At the sample sizes run, it showed no measurable accuracy difference, so I report it for completeness and draw no conclusion from it.</li>
+  <li><strong>Agent harness pilot.</strong> I also tried a prompt-based agent harness on two agent benchmarks. At the sample sizes run, it showed no measurable accuracy difference, so I report it for completeness and draw no conclusion from it.</li>
 </ul>
 
 <h2>Key terms</h2>
@@ -291,7 +291,7 @@ gpu_memory_utilization.</code></pre>
 <h3>The FP8 KV cache: not recommended at this scale</h3>
 <p>Storing the KV cache in 8-bit precision lowered throughput (by 14% on the 27B model with 16 requests at once) and raised the p99 time to first token from 0.53 s to 1.47 s on <code>shared_prefix</code>. Its purpose is to free memory, but at these model sizes memory is not the limiting factor, and the extra conversion work shows up as lost speed. It is not part of the recommended setup.</p>
 
-<h3>Agent harness study</h3>
+<h3>Agent harness pilot</h3>
 <p>I also asked whether a carefully engineered prompt for the coding agent (the &ldquo;harness&rdquo;), combined with the tuned engine, makes agents more accurate. I compared it with the default agent on the default engine, using Terminal-Bench 2.1 (command-line tasks, Qwen3.8-27B) and τ²-bench (customer-service conversations, Qwen3.5-9B). At the sample sizes I could afford, there was no reliable difference.</p>
 <div class="table-wrap"><table>
 <thead><tr><th>task set (same tasks in both arms; valid outcomes only)</th><th>tasks</th><th>default</th><th>engineered</th><th>note</th></tr></thead>
@@ -322,7 +322,7 @@ gpu_memory_utilization.</code></pre>
 <p class="small">A deployed endpoint keeps its GPU allocated until it is stopped, so shut it down when a run is finished.</p>
 
 <h2>Acknowledgements</h2>
-<p class="muted">This work builds on vLLM and the Qwen model family. The agent-harness study used Terminal-Bench 2.1 (run with Harbor) and τ²-bench.</p>
+<p class="muted">This work builds on vLLM and the Qwen model family. The agent-harness pilot used Terminal-Bench 2.1 (run with Harbor) and τ²-bench.</p>
 
 <h2 id="math">Appendix: how multi-token prediction works</h2>
 <div class="callout"><strong>What I did and did not do.</strong>I did not design or train the MTP head. It ships inside each Qwen model, trained by the model&rsquo;s authors. My work is to switch it on, choose how many tokens it proposes, and measure the result. This section gives the mathematics of how it is used and why it makes generation faster, and checks the theory against my measurements.</div>

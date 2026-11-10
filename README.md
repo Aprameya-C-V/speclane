@@ -1,8 +1,9 @@
 # SpecLane: Serving Small Hybrid-Attention Models Under Agent Traffic
 
-**A reproducible vLLM configuration study of Qwen3.8-27B-FP8 and Qwen3.5-9B.**
-It defines a vanilla baseline, changes one engine setting at a time, and measures throughput,
-tail latency and answer quality under traffic shaped like agent loops.
+**A reproducible vLLM serving configuration for Qwen3.8-27B-FP8 and Qwen3.5-9B.**
+It defines a vanilla baseline, a recommended profile, and one change at a time on top of it.
+The benchmarks in this repository are the verification: throughput, tail latency and answer
+quality under traffic shaped like agent loops, run against the deployed configuration.
 
 This repository holds the profiles, the workloads, the Modal sweep runner, the deployable
 endpoint, the quality check, the raw per-run results and the paper source. Every number below is
@@ -14,8 +15,8 @@ Technical report: [`docs/index.html`](docs/index.html), served at
 Detailed measurements, bugs and withdrawn claims: [`FINDINGS.md`](FINDINGS.md). Agent-harness
 pilot (dropped, inconclusive, code not kept): [`DEVIATIONS.md`](DEVIATIONS.md).
 
-> The techniques studied (speculative decoding, FP8 KV cache, scheduler limits) are existing
-> engine features. This is a measurement study, not a new method.
+> The settings used (speculative decoding, FP8 KV cache, scheduler limits) are existing vLLM
+> features. This is a serving configuration with a verification run behind it, not a new method.
 
 ## Results
 
@@ -45,7 +46,7 @@ thinking off, exact match on the final number:
 The differences are one and two questions out of 200, within sampling noise. Baselines
 reproduced within about 2% across separate boots, so differences below about 5% are not claimed.
 
-## What is new here
+## What this repo provides
 
 1. **A baseline definition and a one-change-at-a-time protocol.** Vanilla means engine defaults
    plus only the flags needed to start and a fixed 16,384-token context, so engine comparisons
@@ -124,7 +125,7 @@ Deployed endpoints bill continuously (`min_containers=1`). Stop them with `modal
 
 ## Status
 
-Complete as a small study. All Modal apps are stopped and the model-weights volume has been
-deleted (weights re-download from Hugging Face on the next run). The paper still has
-placeholders: authors and date, repository URL, driver and model revision hashes, and a
-related-work pass that checks each citation.
+Complete. The configuration, the deployable endpoint and the verification runs are all done. All
+Modal apps are stopped and the model-weights volume has been deleted (weights re-download from
+Hugging Face on the next run). The paper still has placeholders: authors and date, repository
+URL, driver and model revision hashes, and a related-work pass that checks each citation.

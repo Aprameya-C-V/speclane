@@ -2,7 +2,7 @@
 
 Every throughput and latency number here is generated from the result files in
 `infer/results/` by `paper/make_results.py`. The GSM8K numbers come from
-`scripts/gsm8k_endpoint.py` run on live endpoints. The agent-study numbers in section 5 come
+`scripts/gsm8k_endpoint.py` run on live endpoints. The agent-pilot numbers in section 5 come
 from the pilot recorded in `DEVIATIONS.md`; that code is not part of this repository. Single
 runs unless stated.
 
@@ -103,7 +103,7 @@ The same baseline profile, booted separately, reproduced within about 2% in thro
 Differences below roughly 5% are therefore treated as noise. GSM8K on the baselines was
 0.90 to 0.91 across boots.
 
-## 5. A dropped agent-harness study
+## 5. A dropped agent-harness pilot
 
 I also tested whether an engineered prompt harness plus the tuned engine improves agent
 accuracy. It did not, at a sample size that could show it. Numbers are paired comparisons of
